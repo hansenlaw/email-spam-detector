@@ -1,8 +1,8 @@
 """
-SMS Spam Detector
------------------
+Email Spam Detector
+-------------------
 NLP pipeline: text cleaning → TF-IDF → 4 classifiers → model export.
-Dataset: UCI SMS Spam Collection (5,572 messages).
+Dataset: Email spam dataset (5,572 emails).
 """
 
 import os
@@ -76,13 +76,13 @@ MODELS = {
 def load_data(path: str) -> pd.DataFrame:
     log.info("Loading dataset → %s", path)
     df = pd.read_csv(path, encoding="latin1")
-    df = df[["v1", "v2"]].rename(columns={"v1": "label", "v2": "message"})
+    df = df[["v1", "v2"]].rename(columns={"v1": "label", "v2": "email"})
 
     total  = len(df)
     n_ham  = (df["label"] == "ham").sum()
     n_spam = (df["label"] == "spam").sum()
     log.info(
-        "Loaded %d messages  |  ham: %d (%.1f%%)  spam: %d (%.1f%%)",
+        "Loaded %d emails  |  ham: %d (%.1f%%)  spam: %d (%.1f%%)",
         total, n_ham, 100 * n_ham / total, n_spam, 100 * n_spam / total,
     )
     return df
@@ -122,13 +122,13 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     sw = set(stopwords.words("english"))
 
     df = df.copy()
-    df["message"]    = df["message"].apply(clean_text)
-    df["tokens"]     = df["message"].apply(
+    df["email"]    = df["email"].apply(clean_text)
+    df["tokens"]     = df["email"].apply(
         lambda t: [w for w in word_tokenize(t) if w not in sw]
     )
-    df["message"]    = df["tokens"].apply(" ".join)
+    df["email"]    = df["tokens"].apply(" ".join)
     df["target"]     = (df["label"] == "spam").astype(int)
-    df["char_len"]   = df["message"].str.len()
+    df["char_len"]   = df["email"].str.len()
     df["word_count"] = df["tokens"].apply(len)
 
     log.info("Preprocessing done in %.1fs", time.time() - t0)
@@ -136,7 +136,7 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# 3. EDA — class distribution + message length
+# 3. EDA — class distribution + email length
 # ---------------------------------------------------------------------------
 
 def plot_class_distribution(df: pd.DataFrame) -> None:
@@ -157,24 +157,24 @@ def plot_class_distribution(df: pd.DataFrame) -> None:
             bar.get_height() + 50,
             f"{val:,}", ha="center", fontweight="bold", fontsize=12,
         )
-    axes[0].set_title("Message Class Distribution", fontsize=13, fontweight="bold", pad=10)
+    axes[0].set_title("Email Class Distribution", fontsize=13, fontweight="bold", pad=10)
     axes[0].set_ylabel("Count", fontsize=11)
     axes[0].set_ylim(0, counts.max() * 1.15)
     axes[0].set_facecolor("#F8F9FA")
     axes[0].spines[["top", "right"]].set_visible(False)
 
-    # Message length histogram
+    # Email length histogram
     for label, color in zip(["ham", "spam"], colors):
         subset = df[df["label"] == label]["char_len"]
         axes[1].hist(subset, bins=40, alpha=0.65, color=color, label=label, edgecolor="white")
-    axes[1].set_title("Message Length by Class", fontsize=13, fontweight="bold", pad=10)
+    axes[1].set_title("Email Length by Class", fontsize=13, fontweight="bold", pad=10)
     axes[1].set_xlabel("Characters (after preprocessing)", fontsize=10)
     axes[1].set_ylabel("Frequency", fontsize=10)
     axes[1].legend(fontsize=11)
     axes[1].set_facecolor("#F8F9FA")
     axes[1].spines[["top", "right"]].set_visible(False)
 
-    plt.suptitle("Exploratory Data Analysis — UCI SMS Spam Collection", fontsize=14, fontweight="bold", y=1.01)
+    plt.suptitle("Exploratory Data Analysis — Email Spam Dataset", fontsize=14, fontweight="bold", y=1.01)
     plt.tight_layout()
     out = os.path.join(OUT_DIR, "class_distribution.png")
     plt.savefig(out, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
@@ -189,7 +189,7 @@ def plot_class_distribution(df: pd.DataFrame) -> None:
 def plot_top_terms(df: pd.DataFrame) -> None:
     """Average TF-IDF score per term grouped by class — reveals spam signal words."""
     tfidf_viz = TfidfVectorizer(stop_words="english", max_features=5000)
-    X_all     = tfidf_viz.fit_transform(df["message"])
+    X_all     = tfidf_viz.fit_transform(df["email"])
     features  = np.array(tfidf_viz.get_feature_names_out())
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
@@ -227,7 +227,7 @@ def plot_top_terms(df: pd.DataFrame) -> None:
 
 def build_features(df: pd.DataFrame):
     log.info("Building TF-IDF feature matrix...")
-    X = df["message"].values
+    X = df["email"].values
     y = df["target"].values
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -449,8 +449,8 @@ def print_summary(results: dict) -> None:
 
 def demo_predict(model, tfidf) -> None:
     samples = [
-        ("WINNER!! You have been selected for a £900 prize reward. Call 09061743810 now!", "spam"),
-        ("Congratulations ur awarded 500 of CD vouchers or 125gift guaranteed FREE entry", "spam"),
+        ("WINNER!! You have been selected for a FREE £900 prize reward. Click to claim now!", "spam"),
+        ("Congratulations! You are awarded 500 CD vouchers or a £125 gift. Guaranteed FREE entry.", "spam"),
         ("Hey, are we still on for lunch tomorrow? Let me know.", "ham"),
         ("I'll be home by 7. Can you pick up some groceries on the way?", "ham"),
     ]
@@ -476,7 +476,7 @@ def main():
     t_start = time.time()
 
     print("=" * 65)
-    print("   SMS SPAM DETECTION — NLP + Machine Learning Pipeline")
+    print("   EMAIL SPAM DETECTION — NLP + Machine Learning Pipeline")
     print("=" * 65)
 
     df = load_data(DATA_PATH)
